@@ -27,7 +27,7 @@ Before you begin, you will need:
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/cf-alias.git
+git clone https://github.com/chrystalio/cf-alias.git
 cd cf-alias
 ```
 
