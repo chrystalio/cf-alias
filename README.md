@@ -62,11 +62,26 @@ Then, open the .env file and replace the placeholder values with your actual Clo
 ---
 
 ## 💻 Usage
-Create a new alias:
+
+**Create a new alias:**
 This creates a new alias rule — `github@yourdomain.com` — forwarding to your default destination address.
 
 ```bash
 python cf-alias.py create github
+```
+
+**List all aliases:**
+Print every routing rule on the zone, with the alias address, destination, rule ID, and status.
+
+```bash
+python cf-alias.py list
+```
+
+**Delete an alias:**
+Pass the `Rule ID` from the `list` output to remove the rule.
+
+```bash
+python cf-alias.py delete <rule_id>
 ```
 
 ### View help
