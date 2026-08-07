@@ -6,17 +6,18 @@ from cloudflare import Cloudflare
 dotenv.load_dotenv()
 
 def main():
+    client = Cloudflare(api_token=os.getenv("CF_API_TOKEN"))
     parser = argparse.ArgumentParser(description="Cloudflare Email Forwarding Alias Manager")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
     add_parser = subparsers.add_parser("create", help="Create a new email alias")
     add_parser.add_argument("name", type=str, help="Name of the email alias to add")
 
+    list_parser = subparsers.add_parser("list", help="list of email aliases")
+
     args = parser.parse_args()
 
     if  args.command == "create":
-
-        client = Cloudflare(api_token=os.getenv("CF_API_TOKEN"))
 
         rule = client.email_routing.rules.create(
             zone_id=os.getenv("CF_ZONE_ID"),
@@ -41,6 +42,24 @@ def main():
         print(f"  • Forward To  : {os.getenv('DEFAULT_FORWARD_TO')}")
         print(f"  • Rule ID     : {rule.id}")
         print(f"  • Status      : Active\n")
+
+    elif args.command == "list": 
+        rules = client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID"))
+
+        print("\n📜 List of Email Routing Rules 📜\n"
+        "--------------------------------------------------")
+        for rule in rules:
+            try:
+                alias_email = rule.matchers[0].value if rule.matchers else "N/A"
+                destination_email = rule.actions[0].value[0] if rule.actions else "N/A"
+            except (IndexError, AttributeError):
+                alias_email = "Unknown"
+                destination_email = "Unknown"
+            print(f"  • Alias       : {alias_email}")
+            print(f"  • Forward To  : {destination_email}")
+            print(f"  • Rule ID     : {rule.id}")
+            print(f"  • Status      : {'Active' if rule.enabled else 'Inactive'}")
+            print("--------------------------------------------------")
 
 if __name__ == "__main__":
     main()
