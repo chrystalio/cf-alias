@@ -13,9 +13,16 @@ def main():
     add_parser = subparsers.add_parser("create", help="Create a new email alias")
     add_parser.add_argument("name", type=str, help="Name of the email alias to add")
 
-    list_parser = subparsers.add_parser("list", help="list of email aliases")
+    subparsers.add_parser("list", help="list of email aliases")
+
+    delete_parser = subparsers.add_parser("delete", help="Delete an existing email alias")
+    delete_parser.add_argument("rule_id", type=str, help="ID of the email alias to delete")
 
     args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return
 
     if  args.command == "create":
 
@@ -60,6 +67,13 @@ def main():
             print(f"  • Rule ID     : {rule.id}")
             print(f"  • Status      : {'Active' if rule.enabled else 'Inactive'}")
             print("--------------------------------------------------")
+
+    elif args.command == "delete":
+        client.email_routing.rules.delete(
+            zone_id=os.getenv("CF_ZONE_ID"),
+            rule_identifier=args.rule_id
+        )
+        print(f"\n🗑️  Email Routing Rule with ID {args.rule_id} has been deleted successfully!\n")
 
 if __name__ == "__main__":
     main()
