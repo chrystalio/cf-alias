@@ -1,10 +1,68 @@
 import argparse
 import os
+import sys
+from pathlib import Path
 
 import dotenv
 from cloudflare import Cloudflare
 
-dotenv.load_dotenv()
+
+# Template for the user config file. No secrets — placeholders only.
+ENV_TEMPLATE = """\
+# ~/.config/cf-alias/.env (Linux/macOS)
+# %APPDATA%\\cf-alias\\.env (Windows)
+# Override with CF_ALIAS_ENV=/path/to/.env
+CF_API_TOKEN=your_actual_api_token_here
+CF_ZONE_ID=your_actual_zone_id_here
+DEFAULT_FORWARD_TO=email@example.com
+DOMAIN=your_domain_here
+"""
+
+
+def _config_path() -> Path:
+    """Cross-platform location for the user's .env file.
+
+    Priority: $CF_ALIAS_ENV if set → ~/.config/cf-alias/.env (Linux/macOS XDG)
+    → ~/AppData/Roaming/cf-alias/.env (Windows).
+    """
+    override = os.environ.get("CF_ALIAS_ENV")
+    if override:
+        return Path(override)
+
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "cf-alias" / ".env"
+    return Path.home() / ".config" / "cf-alias" / ".env"
+
+
+def _find_env() -> Path | None:
+    """Return the first .env path that exists, preferring the user config dir."""
+    candidates = [
+        _config_path(),
+        Path(__file__).resolve().parent / ".env",  # dev: alongside the script
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+dotenv.load_dotenv(_find_env())
+
+REQUIRED_ENV_VARS = ("CF_API_TOKEN", "CF_ZONE_ID", "DOMAIN", "DEFAULT_FORWARD_TO")
+
+
+def require_env():
+    missing = [name for name in REQUIRED_ENV_VARS if not os.getenv(name)]
+    if missing:
+        raise SystemExit(
+            "Missing required environment variables: "
+            + ", ".join(missing)
+            + f"\nCreate a .env at: {_config_path()}"
+            + "\n\nPaste this template and fill in your values:\n"
+            + ENV_TEMPLATE
+        )
 
 def main():
     client = Cloudflare(api_token=os.getenv("CF_API_TOKEN"))
@@ -24,6 +82,8 @@ def main():
     if not args.command:
         parser.print_help()
         return
+
+    require_env()
 
     if  args.command == "create":
 
