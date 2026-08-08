@@ -90,13 +90,20 @@ The `[project.scripts]` entry is what installs the `cf-alias` binary — it poin
 
 ## ⚙️ Configuration
 
-Copy the provided `.env.example` template to create your own `.env` file:
+`cf-alias` looks for your `.env` file in this order:
+
+1. The path in `CF_ALIAS_ENV` (if set) — e.g. `CF_ALIAS_ENV=/path/to/.env`.
+2. `~/.config/cf-alias/.env` on Linux/macOS, or `%APPDATA%\cf-alias\.env` on Windows.
+3. A `.env` next to the script (dev / `python cf_alias.py`).
+
+If you run an installed `cf-alias` and none of these exist, it prints the exact path and a template to fill in — just create the file there:
 
 ```bash
-cp .env.example .env
+mkdir -p ~/.config/cf-alias
+cp .env.example ~/.config/cf-alias/.env
 ```
 
-Then open `.env` and replace the placeholder values with your actual Cloudflare credentials:
+Then open the file and replace the placeholder values with your actual Cloudflare credentials:
 
 ```env
 CF_API_TOKEN=your_actual_api_token_here
@@ -105,7 +112,7 @@ DEFAULT_FORWARD_TO=email@example.com
 DOMAIN=your_domain_here
 ```
 
-`.env` is gitignored and never committed.
+The `.env` files are never committed to the repo.
 
 ---
 
