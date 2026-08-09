@@ -87,6 +87,15 @@ def main():
 
     if  args.command == "create":
 
+        target_email = f"{args.name}@{os.getenv('DOMAIN')}"
+        rules = client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID"))
+
+        for rule in rules:
+            existing_alias = rule.matchers[0].value if rule.matchers else None
+            if existing_alias == target_email:
+                print(f"\n⚠️  Alias '{target_email}' already exists. No new rule created.\n")
+                return
+
         rule = client.email_routing.rules.create(
             zone_id=os.getenv("CF_ZONE_ID"),
             name=f"Alias for {args.name}",
@@ -95,7 +104,7 @@ def main():
                 {
                     "type": "literal",
                     "field": "to",
-                    "value": f"{args.name}@{os.getenv('DOMAIN')}"
+                    "value": target_email
                 }
             ],
             actions=[
@@ -106,7 +115,7 @@ def main():
             ]
         )
         print("\n✨ Email Routing Rule Created Successfully! ✨")
-        print(f"  • Alias       : {args.name}@{os.getenv('DOMAIN')}")
+        print(f"  • Alias       : {target_email}")
         print(f"  • Forward To  : {os.getenv('DEFAULT_FORWARD_TO')}")
         print(f"  • Rule ID     : {rule.id}")
         print(f"  • Status      : Active\n")
