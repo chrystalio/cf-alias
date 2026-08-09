@@ -121,7 +121,16 @@ cf-alias create github
 
 **List all aliases:**
 
-Print every routing rule on the zone, with the alias address, destination, rule ID, and status.
+Print every routing rule on the zone as an aligned table — alias, destination, rule ID, and status in columns. Empty zones print a "No email routing rules found" notice. Example:
+
+```
+📜 Email Routing Rules 📜
+
+ALIAS         FORWARD TO    RULE ID    STATUS
+──────────    ────────────  ─────────  ───────
+github@…      me@gmail.com  abc12345   Active
+aws@…         me@gmail.com  def67890   Active
+```
 
 ```bash
 cf-alias list
