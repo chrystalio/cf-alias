@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-08-09
+
+### Fixed
+- `list` now defensively coerces every table cell to a string before computing column widths or rendering, preventing `TypeError: object of type 'NoneType' has no len()` on rules with None-valued fields (e.g. worker/drop actions with no `value`).
+
+### Changed
+- `list` output reformatted as a one-row-per-rule ASCII table with aligned columns (header + separator + rows), replacing the previous 5-line-per-rule block format. Empty rule list now prints a friendly "No email routing rules found" message instead of an empty table.
+
 ## [0.3.0] - 2026-08-09
 
 ### Changed

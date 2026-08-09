@@ -120,23 +120,64 @@ def main():
         print(f"  • Rule ID     : {rule.id}")
         print(f"  • Status      : Active\n")
 
-    elif args.command == "list": 
-        rules = client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID"))
+    elif args.command == "list":
+        rules = list(client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID")))
 
-        print("\n📜 List of Email Routing Rules 📜\n"
-        "--------------------------------------------------")
+        if not rules:
+            print("\n📜 No email routing rules found for this zone.\n")
+            return
+
+        def _cell(value, missing="Unknown"):
+            """Coerce a rule field into a printable string. Any None / missing → 'Unknown'."""
+            if value is None:
+                return missing
+            return str(value) if value != "" else missing
+
+        rows = []
         for rule in rules:
             try:
-                alias_email = rule.matchers[0].value if rule.matchers else "N/A"
-                destination_email = rule.actions[0].value[0] if rule.actions else "N/A"
-            except (IndexError, AttributeError):
+                alias_email = _cell(rule.matchers[0].value, "N/A") if rule.matchers else "N/A"
+                destination_email = (
+                    _cell(rule.actions[0].value[0], "N/A") if rule.actions else "N/A"
+                )
+                rule_id = _cell(rule.id)
+            except (IndexError, AttributeError, TypeError):
                 alias_email = "Unknown"
                 destination_email = "Unknown"
-            print(f"  • Alias       : {alias_email}")
-            print(f"  • Forward To  : {destination_email}")
-            print(f"  • Rule ID     : {rule.id}")
-            print(f"  • Status      : {'Active' if rule.enabled else 'Inactive'}")
-            print("--------------------------------------------------")
+                rule_id = "Unknown"
+            status = "Active" if rule.enabled else "Inactive"
+            rows.append((alias_email, destination_email, rule_id, status))
+
+        headers = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS")
+
+        # Defense in depth: coerce every cell to a string before measuring or
+        # rendering. _cell() should have already done this, but if a future
+        # SDK field shape leaks a None/non-str through, the table still renders
+        # instead of raising TypeError on len()/ljust().
+        def _safe_cell(value, missing="Unknown"):
+            if value is None:
+                return missing
+            return value if isinstance(value, str) else str(value) if value != "" else missing
+
+        safe_rows = [
+            tuple(_safe_cell(c) for c in row) for row in rows
+        ]
+        safe_headers = tuple(_safe_cell(h, missing=h) for h in headers)
+
+        widths = [
+            max(len(safe_headers[i]), *(len(row[i]) for row in safe_rows))
+            for i in range(len(safe_headers))
+        ]
+
+        def _fmt(cells):
+            return "  ".join(str(cell).ljust(widths[i]) for i, cell in enumerate(cells))
+
+        print("\n📜 Email Routing Rules 📜\n")
+        print(_fmt(safe_headers))
+        print("  ".join("─" * w for w in widths))
+        for row in safe_rows:
+            print(_fmt(row))
+        print()
 
     elif args.command == "delete":
         client.email_routing.rules.delete(
