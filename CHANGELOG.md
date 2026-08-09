@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-09
+
+### Changed
+- `create` is now idempotent: lists existing rules first and short-circuits with a warning if `{name}@{DOMAIN}` already exists, instead of creating a duplicate rule.
+- `target_email` extracted to a local in the `create` branch and reused in the matcher, the duplicate check, and the success print (previously recomputed inline three times).
+
 ## [0.2.0] - 2026-08-08
 
 ### Changed
