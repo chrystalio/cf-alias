@@ -35,7 +35,9 @@ cd cf-alias
 uv tool install .
 ```
 
-`uv tool install` drops `cf-alias` into its own isolated environment and exposes the command on your `PATH` — no venv activation needed. Update it with `uv tool install --force .` and remove it with `uv tool uninstall cf-alias`.
+`uv tool install` drops `cf-alias` into its own isolated environment and exposes the command on your `PATH` — no venv activation needed. Update it with `uv tool install --reinstall .` and remove it with `uv tool uninstall cf-alias`.
+
+> **Pulling new code? Run `uv cache clean cf-alias && uv tool install --reinstall .`.** `uv tool install --reinstall` rebuilds from the working tree, but if the cached wheel from your previous install is newer than your source file's mtime (common after `git pull`), it'll still serve the stale build. Clearing the cache forces a fresh build.
 
 **With `pip` (editable install in a venv):**
 
@@ -106,6 +108,24 @@ DOMAIN=your_domain_here
 The `.env` files are never committed to the repo.
 
 If `cf-alias` prints a "Missing required environment variables" message, it means one or more of the four above is unset or empty. The same template is embedded in the script output — paste it into the path it tells you.
+
+## Troubleshooting
+
+**`cf-alias` is crashing on a bug you already fixed in the source.**
+
+The tool binary lives in its own uv environment (`~/.local/share/uv/tools/cf-alias/`), separate from your working tree. A normal reinstall will serve a cached build from before your fix landed. Force a fresh build:
+
+```bash
+uv cache clean cf-alias && uv tool install --reinstall .
+```
+
+If you still see the bug, confirm the installed file actually has your fix:
+
+```bash
+grep -c "_safe_cell" ~/.local/share/uv/tools/cf-alias/lib/python3.12/site-packages/cf_alias.py
+```
+
+A non-zero count means the new code is installed; `0` means the reinstall didn't pick up your source.
 
 ## Usage
 
