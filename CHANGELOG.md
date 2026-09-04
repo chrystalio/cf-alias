@@ -11,15 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `delete` now prompts `Are you sure you want to delete rule <rule_id>? [y/N]` before calling the API; answering anything other than `y`/`Y` aborts without changes.
 - `delete` accepts `-y` / `--yes` to skip the confirmation prompt for scripted/non-interactive use.
 - `delete` accepts `--dry-run` to print which rule would be deleted and exit without touching the API.
-- `tui` subcommand to launch an interactive Textual UI for browsing, filtering, sorting, and editing aliases ([#PR])
-
-## [0.3.1] - 2026-08-09
+- `create` accepts `--category <name>` to tag a new alias with a local category at creation time.
+- `categorize` subcommand: `cf-alias categorize <rule_id> <category>` sets a category; `cf-alias categorize <rule_id> --clear` removes it. Categories are persisted in a local SQLite database at `~/.config/cf-alias/categories.db` (overridable via `CF_ALIAS_DB`), independent of the Cloudflare API.
+- `tui` subcommand launches an interactive arrow-key menu for create, list, delete, and categorize. Shows a domain banner with watermark on launch, uses rich tables with `●`/`○` status icons for list rendering.
+- `AppContext` dataclass and `build_context()` helper in `cf_alias.main` for sharing Cloudflare client + zone config between CLI and TUI.
+- `cf_alias/db.py` module for local SQLite category storage with thread-safe `set_category`, `get_category`, `clear_category`, `list_by_category` helpers.
+- Dev tooling: `ruff` (linting) and `pyright` (type checking) configured in `pyproject.toml`. Both run clean on the codebase.
 
 ### Fixed
-- `list` now defensively coerces every table cell to a string before computing column widths or rendering, preventing `TypeError: object of type 'NoneType' has no len()` on rules with None-valued fields (e.g. worker/drop actions with no `value`).
+- `list` and the create-branch idempotency check now paginate through **every** Cloudflare result page, not just the first one. Previously, a duplicate alias on page 2+ would slip through and create a duplicate rule.
+- `create` idempotency now distinguishes between "alias exists with matching destination" (silent skip) and "alias exists with a different destination" (warning showing both addresses).
+- `list` defensively coerces every table cell to a string before computing column widths or rendering, preventing `TypeError: object of type 'NoneType' has no len()` on rules with None-valued fields (e.g. worker/drop actions with no `value`).
+- `delete` cleans up the matching SQLite category row after a successful API delete, so stale category entries don't accumulate.
 
 ### Changed
-- `list` output reformatted as a one-row-per-rule ASCII table with aligned columns (header + separator + rows), replacing the previous 5-line-per-rule block format. Empty rule list now prints a friendly "No email routing rules found" message instead of an empty table.
+- Module-level dotenv loading is now lazy: `_load_env()` runs from `main()` instead of at import, so `import cf_alias.main` no longer has side effects.
+- Argparse parsing happens before env validation, so `cf-alias --help` works without a populated `.env`.
+- Cloudflare client construction moved into `build_context()` and runs after env validation, so missing tokens produce a clear "Missing required environment variables" message instead of an opaque SDK traceback.
+- `list` output table now includes a `CATEGORY` column showing the locally-stored category (or blank when unset).
+- TUI library: built initially with `textual`, then replaced with `questionary` (arrow-key menus) per feedback that the DataTable view was overkill. `textual` removed from `dependencies`; `questionary` and `rich` added.
+
 
 ## [0.3.0] - 2026-08-09
 

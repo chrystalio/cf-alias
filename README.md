@@ -122,7 +122,7 @@ uv cache clean cf-alias && uv tool install --reinstall .
 If you still see the bug, confirm the installed file actually has your fix:
 
 ```bash
-grep -c "_safe_cell" ~/.local/share/uv/tools/cf-alias/lib/python3.12/site-packages/cf_alias.py
+grep -c "_safe_cell" ~/.local/share/uv/tools/cf-alias/lib/python3.12/site-packages/cf_alias/main.py
 ```
 
 A non-zero count means the new code is installed; `0` means the reinstall didn't pick up your source.
@@ -139,17 +139,23 @@ Creates a new alias rule — `github@yourdomain.com` — forwarding to your defa
 cf-alias create github
 ```
 
+Optionally tag it with a category at creation time:
+
+```bash
+cf-alias create github --category dev
+```
+
 **List all aliases:**
 
-Print every routing rule on the zone as an aligned table — alias, destination, rule ID, and status in columns. Empty zones print a "No email routing rules found" notice. Example:
+Print every routing rule on the zone as an aligned table — alias, destination, rule ID, status, and category in columns. Categories are stored locally in `~/.config/cf-alias/categories.db`. Empty zones print a "No email routing rules found" notice. Example:
 
 ```
 📜 Email Routing Rules 📜
 
-ALIAS         FORWARD TO    RULE ID    STATUS
-──────────    ────────────  ─────────  ───────
-github@…      me@gmail.com  abc12345   Active
-aws@…         me@gmail.com  def67890   Active
+ALIAS              FORWARD TO       RULE ID    STATUS    CATEGORY
+───────────────    ──────────────  ────────   ──────   ─────────
+github@…           me@gmail.com     abc12345    Active   dev
+aws@…              me@gmail.com     def67890    Active   infra
 ```
 
 ```bash
@@ -176,6 +182,20 @@ Preview what would happen without actually calling the API using `--dry-run`:
 cf-alias delete <rule_id> --dry-run
 ```
 
+**Categorize an alias:**
+
+Attach a freeform category tag to an existing rule. Categories are stored locally in `~/.config/cf-alias/categories.db` (a SQLite file in your user config dir, separate from the Cloudflare API), so they survive reinstalls but are not synced to Cloudflare.
+
+```bash
+cf-alias categorize <rule_id> dev
+```
+
+Remove the category from a rule:
+
+```bash
+cf-alias categorize <rule_id> --clear
+```
+
 **Interactive menu:**
 
 Launch the interactive arrow-key menu to create, list, delete, and categorize aliases. Each option prompts you for input and confirms destructive actions before applying them.
@@ -184,4 +204,12 @@ Launch the interactive arrow-key menu to create, list, delete, and categorize al
 cf-alias tui
 ```
 
-Navigation: use the arrow keys to move between options, `Enter` to confirm, and `Ctrl+C` to cancel and return to the previous menu.
+Shows a welcome banner on launch with your domain, then presents a menu with:
+
+- **Create alias** — prompt for name and optional category
+- **List aliases** — prints a rich table with `●`/`○` status icons
+- **Delete alias** — select from a list, confirm before deleting
+- **Categorize alias** — set or clear a category tag
+- **Quit** — exit
+
+Navigation: use the arrow keys to move between options, `Enter` to confirm, and `Ctrl+C` to cancel.
