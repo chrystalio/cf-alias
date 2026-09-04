@@ -240,7 +240,13 @@ def main():
             status = "Active" if rule.enabled else "Inactive"
             rows.append((alias_email, destination_email, rule_id, status))
 
-        headers = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS")
+        # Enrich rows with categories from the local SQLite database
+        rows = [
+            (*row, db.get_category(row[2]) or "")
+            for row in rows
+        ]
+
+        headers = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS", "CATEGORY")
 
         # Defense in depth: coerce every cell to a string before measuring or
         # rendering. _cell() should have already done this, but if a future
@@ -291,9 +297,10 @@ def main():
             zone_id=zone_id,
             rule_identifier=args.rule_id
         )
+        db.clear_category(args.rule_id)
         print(
-            f"\n Email Routing Rule with ID {args.rule_id} has been "
-            "deleted successfully!\n"
+            f"\n🗑️  Email Routing Rule with ID {args.rule_id} has been "
+            "deleted successfully! (category cleared)\n"
         )
 
     elif args.command == "categorize":
