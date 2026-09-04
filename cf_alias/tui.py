@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cf_alias import db
+from cf_alias.generator import generate_alias_name
 from cf_alias.main import (
     HEADERS,
     AppContext,
@@ -79,12 +80,29 @@ def _status_icon(enabled: bool) -> str:
 
 
 def _menu_create(ctx: AppContext) -> None:
-    name = questionary.text(
-        "Alias name (the part before @):",
-        validate=lambda text: len(text) > 0 or "Name cannot be empty",
+    choice = questionary.select(
+        "How do you want to create the alias?",
+        choices=[
+            Choice(title="Custom name", value="custom"),
+            Choice(title="Generate random name", value="generate"),
+            Choice(title="<- Cancel", value=None),
+        ],
+        qmark=">>",
     ).ask()
-    if name is None:
+    if choice is None or choice == "cancel":
         return
+
+    if choice == "generate":
+        name = generate_alias_name()
+        console.print(f"  Generated: [cyan]{name}[/cyan]")
+    else:
+        name = questionary.text(
+            "Alias name (the part before @):",
+            validate=lambda text: len(text) > 0 or "Name cannot be empty",
+        ).ask()
+        if name is None:
+            return
+
     category = questionary.text(
         "Category (optional, press Enter to skip):",
         default="",
