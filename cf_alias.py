@@ -6,7 +6,6 @@ from pathlib import Path
 import dotenv
 from cloudflare import Cloudflare
 
-
 # Template for the user config file. No secrets — placeholders only.
 ENV_TEMPLATE = """\
 # ~/.config/cf-alias/.env (Linux/macOS)
@@ -48,9 +47,13 @@ def _find_env() -> Path | None:
     return None
 
 
-dotenv.load_dotenv(_find_env())
-
 REQUIRED_ENV_VARS = ("CF_API_TOKEN", "CF_ZONE_ID", "DOMAIN", "DEFAULT_FORWARD_TO")
+
+# Module-level constants populated lazily by _load_env().
+CF_API_TOKEN: str | None = None
+CF_ZONE_ID: str | None = None
+DOMAIN: str | None = None
+DEFAULT_FORWARD_TO: str | None = None
 
 
 def require_env():
@@ -64,18 +67,59 @@ def require_env():
             + ENV_TEMPLATE
         )
 
+
+def _require_env_str(name: str) -> str:
+    """Return a non-None env var after require_env() has validated presence."""
+    value = os.getenv(name)
+    if value is None:
+        raise SystemExit(f"Unexpectedly missing env var: {name}")
+    return value
+
+
+def _load_env():
+    """Load .env file lazily and populate module constants.
+
+    Called from main() so importing this module has no side effects.
+    """
+    global CF_API_TOKEN, CF_ZONE_ID, DOMAIN, DEFAULT_FORWARD_TO
+    dotenv.load_dotenv(_find_env())
+    CF_API_TOKEN = os.getenv("CF_API_TOKEN")
+    CF_ZONE_ID = os.getenv("CF_ZONE_ID")
+    DOMAIN = os.getenv("DOMAIN")
+    DEFAULT_FORWARD_TO = os.getenv("DEFAULT_FORWARD_TO")
+
+
 def main():
-    client = Cloudflare(api_token=os.getenv("CF_API_TOKEN"))
-    parser = argparse.ArgumentParser(description="Cloudflare Email Forwarding Alias Manager")
+    _load_env()
+    require_env()
+    zone_id = _require_env_str("CF_ZONE_ID")
+    domain = _require_env_str("DOMAIN")
+    default_forward_to = _require_env_str("DEFAULT_FORWARD_TO")
+    client = Cloudflare(api_token=CF_API_TOKEN)
+    parser = argparse.ArgumentParser(
+        description="Cloudflare Email Forwarding Alias Manager"
+    )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
+
     add_parser = subparsers.add_parser("create", help="Create a new email alias")
     add_parser.add_argument("name", type=str, help="Name of the email alias to add")
 
     subparsers.add_parser("list", help="list of email aliases")
 
-    delete_parser = subparsers.add_parser("delete", help="Delete an existing email alias")
-    delete_parser.add_argument("rule_id", type=str, help="ID of the email alias to delete")
+    delete_parser = subparsers.add_parser(
+        "delete", help="Delete an existing email alias"
+    )
+    delete_parser.add_argument(
+        "rule_id", type=str, help="ID of the email alias to delete"
+    )
+    delete_parser.add_argument(
+        "-y", "--yes", action="store_true", help="Skip confirmation prompt"
+    )
+    delete_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without deleting",
+    )
 
     args = parser.parse_args()
 
@@ -83,52 +127,79 @@ def main():
         parser.print_help()
         return
 
-    require_env()
+    if args.command == "create":
+        target_email = f"{args.name}@{domain}"
 
-    if  args.command == "create":
-
-        target_email = f"{args.name}@{os.getenv('DOMAIN')}"
-        rules = client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID"))
-
-        for rule in rules:
-            existing_alias = rule.matchers[0].value if rule.matchers else None
-            if existing_alias == target_email:
-                print(f"\n⚠️  Alias '{target_email}' already exists. No new rule created.\n")
-                return
+        # Paginate through ALL existing rules. Cloudflare's rules.list()
+        # returns a SyncV4PagePaginationArray — iterate every page so we
+        # don't miss a match sitting on page 2+.
+        page = client.email_routing.rules.list(zone_id=zone_id)
+        while True:
+            for rule in page:
+                existing_alias = rule.matchers[0].value if rule.matchers else None
+                if existing_alias == target_email:
+                    first_action = rule.actions[0] if rule.actions else None
+                    existing_destination = None
+                    if first_action is not None:
+                        action_value = first_action.value
+                        existing_destination = action_value[0] if action_value else None
+                    if existing_destination == default_forward_to:
+                        print(
+                            f"\n⚠️  Alias '{target_email}' already exists and "
+                            f"forwards to '{default_forward_to}'.\n"
+                        )
+                    else:
+                        print(
+                            f"\n⚠️  Alias '{target_email}' already exists but "
+                            f"forwards to '{existing_destination}', not "
+                            f"'{default_forward_to}'.\n"
+                        )
+                    return
+            if page.has_next_page():
+                page = page.get_next_page()
+            else:
+                break
 
         rule = client.email_routing.rules.create(
-            zone_id=os.getenv("CF_ZONE_ID"),
+            zone_id=zone_id,
             name=f"Alias for {args.name}",
             enabled=True,
             matchers=[
                 {
                     "type": "literal",
                     "field": "to",
-                    "value": target_email
+                    "value": target_email,
                 }
             ],
             actions=[
                 {
                     "type": "forward",
-                    "value": [os.getenv("DEFAULT_FORWARD_TO")]
+                    "value": [default_forward_to],
                 }
-            ]
+            ],
         )
         print("\n✨ Email Routing Rule Created Successfully! ✨")
         print(f"  • Alias       : {target_email}")
-        print(f"  • Forward To  : {os.getenv('DEFAULT_FORWARD_TO')}")
-        print(f"  • Rule ID     : {rule.id}")
-        print(f"  • Status      : Active\n")
+        print(f"  • Forward To  : {default_forward_to}")
+        print(f"  • Rule ID     : {rule.id if rule else 'N/A'}")
+        print("  • Status      : Active\n")
 
     elif args.command == "list":
-        rules = list(client.email_routing.rules.list(zone_id=os.getenv("CF_ZONE_ID")))
+        # Materialise every page so the table shows the full zone state.
+        page = client.email_routing.rules.list(zone_id=zone_id)
+        rules = list(page)
+        while page.has_next_page():
+            page = page.get_next_page()
+            rules.extend(page)
 
         if not rules:
             print("\n📜 No email routing rules found for this zone.\n")
             return
 
         def _cell(value, missing="Unknown"):
-            """Coerce a rule field into a printable string. Any None / missing → 'Unknown'."""
+            """Coerce a rule field into a printable string.
+            Any None / missing → 'Unknown'.
+            """
             if value is None:
                 return missing
             return str(value) if value != "" else missing
@@ -136,10 +207,17 @@ def main():
         rows = []
         for rule in rules:
             try:
-                alias_email = _cell(rule.matchers[0].value, "N/A") if rule.matchers else "N/A"
-                destination_email = (
-                    _cell(rule.actions[0].value[0], "N/A") if rule.actions else "N/A"
+                first_matcher = rule.matchers[0] if rule.matchers else None
+                alias_email = (
+                    _cell(first_matcher.value, "N/A")
+                    if first_matcher is not None
+                    else "N/A"
                 )
+                first_action = rule.actions[0] if rule.actions else None
+                if first_action is not None and first_action.value:
+                    destination_email = _cell(first_action.value[0], "N/A")
+                else:
+                    destination_email = "N/A"
                 rule_id = _cell(rule.id)
             except (IndexError, AttributeError, TypeError):
                 alias_email = "Unknown"
@@ -157,10 +235,13 @@ def main():
         def _safe_cell(value, missing="Unknown"):
             if value is None:
                 return missing
-            return value if isinstance(value, str) else str(value) if value != "" else missing
+            if isinstance(value, str):
+                return value
+            return str(value) if value != "" else missing
 
         safe_rows = [
-            tuple(_safe_cell(c) for c in row) for row in rows
+            tuple(_safe_cell(c) for c in row)
+            for row in rows
         ]
         safe_headers = tuple(_safe_cell(h, missing=h) for h in headers)
 
@@ -180,11 +261,26 @@ def main():
         print()
 
     elif args.command == "delete":
+        if args.dry_run:
+            print(f"\n🔍 Dry run: would delete rule {args.rule_id}\n")
+            return
+
+        if not args.yes:
+            answer = input(
+                f"Are you sure you want to delete rule {args.rule_id}? [y/N] "
+            )
+            if answer not in ("y", "Y"):
+                print("\nAborted.\n")
+                return
+
         client.email_routing.rules.delete(
-            zone_id=os.getenv("CF_ZONE_ID"),
+            zone_id=zone_id,
             rule_identifier=args.rule_id
         )
-        print(f"\n🗑️  Email Routing Rule with ID {args.rule_id} has been deleted successfully!\n")
+        print(
+            f"\n🗑️  Email Routing Rule with ID {args.rule_id} has been "
+            "deleted successfully!\n"
+        )
 
 if __name__ == "__main__":
     main()
