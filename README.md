@@ -1,33 +1,61 @@
-# 🌩️ cf-alias
+<div align="center">
 
-Command-line Cloudflare email aliases. Because your primary inbox deserves peace, quiet, and zero unwanted newsletters.
+# ⚡ cf-alias
 
-A lightweight Python CLI tool to generate and manage Cloudflare Email Routing aliases on the fly, directly from your terminal.
+**Cloudflare email aliases from your terminal. Your primary inbox deserves peace, quiet, and zero unwanted newsletters.**
+
+</div>
+
+| License | Python | Install |
+|---------|--------|---------|
+| ![MIT](https://img.shields.io/badge/license-MIT-blue) | ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue) | ![uv](https://img.shields.io/badge/uv-tool-orange) |
+
+---
 
 ## Features
 
-- **Quick create:** Generate a new email alias in seconds — no dashboard required.
-- **Idempotent:** Running `cf-alias create github` twice won't duplicate the rule — you'll get a warning instead.
-- **Spam prevention:** Ditch the catch-all. Use explicit aliases to block spam at the network edge.
-- **Simple config:** Securely store your Cloudflare credentials and default forwarding address locally.
-- **Install once, run anywhere:** Ships as a Python package with a `cf-alias` console-script entry point — no `python …` prefix needed after install.
+| Goal | One-liner |
+|------|-----------|
+| Create | `cf-alias create github` |
+| Generate random | `cf-alias create --generate` |
+| Tag at creation | `--category dev` |
+| List | `cf-alias list` |
+| Delete safely | `cf-alias delete <id>` (with confirm prompt) |
+| Categorize | local SQLite tag attached to rule ID |
+| TUI | arrow-key menu + rich tables |
+
+Run `cf-alias <subcommand> --help` for the full flag list.
+
+---
 
 ## Prerequisites
 
-Before you begin, you will need:
+1. **A domain** with Cloudflare Email Routing enabled.
+2. **A Cloudflare API token** with **Email Routing: Edit** permission.
+3. **Your zone ID** — visible in the right sidebar of your Cloudflare dashboard.
+4. **Python 3.10+** (or use [`uv`](https://github.com/astral-sh/uv), which can manage Python for you).
 
-1. A domain with Cloudflare Email Routing enabled.
-2. A Cloudflare API Token with **Email Routing: Edit** permissions.
-3. Your domain's **Zone ID** (found on the right-hand sidebar of your Cloudflare dashboard overview).
-4. Python 3.10+ (matches `pyproject.toml` `requires-python`).
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/chrystalio/cf-alias.git
+cd cf-alias
+cp .env.example .env       # fill in your Cloudflare values
+uv tool install .          # or: pip install -e .
+cf-alias create github
+```
+
+---
 
 ## Installation
 
-### Option A — Install as a package (recommended)
+Pick whichever path matches your environment. They all do the same thing.
 
-This installs `cf-alias` as a command on your `PATH` so you can run it from anywhere.
+### `uv tool install .` (recommended)
 
-**With `uv` (recommended):**
+Drops `cf-alias` on your `PATH`. No venv to manage.
 
 ```bash
 git clone https://github.com/chrystalio/cf-alias.git
@@ -35,68 +63,54 @@ cd cf-alias
 uv tool install .
 ```
 
-`uv tool install` drops `cf-alias` into its own isolated environment and exposes the command on your `PATH` — no venv activation needed. Update it with `uv tool install --reinstall .` and remove it with `uv tool uninstall cf-alias`.
-
-> **Pulling new code? Run `uv cache clean cf-alias && uv tool install --reinstall .`.** `uv tool install --reinstall` rebuilds from the working tree, but if the cached wheel from your previous install is newer than your source file's mtime (common after `git pull`), it'll still serve the stale build. Clearing the cache forces a fresh build.
-
-**With `pip` (editable install in a venv):**
+**Update after a `git pull`** — clearing the cache avoids serving a stale wheel:
 
 ```bash
-git clone https://github.com/chrystalio/cf-alias.git
-cd cf-alias
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
+uv cache clean cf-alias && uv tool install --reinstall .
+```
+
+**Uninstall:** `uv tool uninstall cf-alias`.
+
+### `pip install -e .` (in a venv)
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 ```
 
-After any of the above, run `cf-alias --help` to confirm the install worked.
-
-### Option B — Run the script directly (no package install)
-
-If you'd rather skip the install and just run the file:
-
-**With `uv` (simplest — no venv needed):**
+### `uv run` (no install, throws away the env each run)
 
 ```bash
 git clone https://github.com/chrystalio/cf-alias.git
 cd cf-alias
-uv run python cf_alias.py --help
+uv run python -m cf_alias --help
 ```
 
-`uv run` resolves the deps from `pyproject.toml` into a throwaway env each time.
-
-**With `pip` + venv (deps only, no package install):**
+### Run the package manually (no `pip install`)
 
 ```bash
-git clone https://github.com/chrystalio/cf-alias.git
-cd cf-alias
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
-pip install cloudflare python-dotenv
+pip install cloudflare python-dotenv questionary rich faker
+python -m cf_alias --help
 ```
 
-Then run `python cf_alias.py …` for every command. The file is `cf_alias.py`, not `cf-alias.py` — hyphens aren't valid in Python module names.
+> The CLI command is `cf-alias` but the Python module is `cf_alias` — Python doesn't allow hyphens in identifiers. `pyproject.toml`'s `[project.scripts]` exposes the hyphenated name.
 
-### Why is the CLI called `cf-alias` but the file `cf_alias.py`?
-
-The `[project.scripts]` entry in `pyproject.toml` is what installs the `cf-alias` binary on your `PATH`. The Python module name uses an underscore because Python doesn't allow hyphens in identifiers.
+---
 
 ## Configuration
 
-`cf-alias` looks for your `.env` file in this order:
+`cf-alias` looks for your `.env` in this order:
 
-1. The path in `CF_ALIAS_ENV` (if set) — e.g. `CF_ALIAS_ENV=/path/to/.env`.
-2. `~/.config/cf-alias/.env` on Linux/macOS, or `%APPDATA%\cf-alias\.env` on Windows.
-3. A `.env` next to the script (dev / `python cf_alias.py`).
-
-If you run `cf-alias` and none of these exist, the script prints the exact path it expected and a template to fill in. To set things up from scratch:
+1. `$CF_ALIAS_ENV` if set
+2. `~/.config/cf-alias/.env` (Linux/macOS) or `%APPDATA%\cf-alias\.env` (Windows)
+3. A `.env` next to the source (dev mode)
 
 ```bash
 mkdir -p ~/.config/cf-alias
-cp .env.example ~/.config/cf-alias/.env  # .env.example is included in the repo
+cp .env.example ~/.config/cf-alias/.env
 ```
 
-Then open the file and replace the placeholder values with your actual Cloudflare credentials:
+Edit it:
 
 ```env
 CF_API_TOKEN=your_actual_api_token_here
@@ -105,124 +119,107 @@ DEFAULT_FORWARD_TO=email@example.com
 DOMAIN=your_domain_here
 ```
 
-The `.env` files are never committed to the repo.
+`.env` is gitignored. If `cf-alias` reports a missing env var, it prints the path and a template you can paste.
 
-If `cf-alias` prints a "Missing required environment variables" message, it means one or more of the four above is unset or empty. The same template is embedded in the script output — paste it into the path it tells you.
-
-## Troubleshooting
-
-**`cf-alias` is crashing on a bug you already fixed in the source.**
-
-The tool binary lives in its own uv environment (`~/.local/share/uv/tools/cf-alias/`), separate from your working tree. A normal reinstall will serve a cached build from before your fix landed. Force a fresh build:
-
-```bash
-uv cache clean cf-alias && uv tool install --reinstall .
-```
-
-If you still see the bug, confirm the installed file actually has your fix:
-
-```bash
-grep -c "_safe_cell" ~/.local/share/uv/tools/cf-alias/lib/python3.12/site-packages/cf_alias/main.py
-```
-
-A non-zero count means the new code is installed; `0` means the reinstall didn't pick up your source.
+---
 
 ## Usage
 
-> The examples below use the installed `cf-alias` command. If you're running the script directly, swap `cf-alias` for `python cf_alias.py` (e.g. `python cf_alias.py create github`). Run `cf-alias --help` any time for the full command list.
+CLI form: `cf-alias <subcommand> [options]`.
 
-**Create a new alias:**
-
-Creates a new alias rule — `github@yourdomain.com` — forwarding to your default destination address. If the alias already exists, `cf-alias` prints a warning and exits without creating a duplicate.
+### create — add a new alias
 
 ```bash
 cf-alias create github
 ```
 
-Auto-generate a random alias name instead of choosing your own:
+Creates `github@<DOMAIN>` forwarding to `DEFAULT_FORWARD_TO`. If the alias already exists, prints a warning and exits — no duplicates.
+
+**Generate a random name** when you don't care what it's called:
 
 ```bash
-cf-alias create --generate
+cf-alias create --generate           # name is a random English word
+cf-alias create --generate --print-only  # preview only, no API call
 ```
 
-Preview a generated name without creating it:
+The generator retries up to 10 times on collision; after that, pass a custom name.
 
-```bash
-cf-alias create --generate --print-only
-```
-
-Tag it with a category at creation time:
+**Tag at creation time** with a category stored locally:
 
 ```bash
 cf-alias create github --category dev
-cf-alias create --generate --category dev
 ```
 
-**List all aliases:**
-
-Print every routing rule on the zone as an aligned table — alias, destination, rule ID, status, and category in columns. Categories are stored locally in `~/.config/cf-alias/categories.db`. Empty zones print a "No email routing rules found" notice. Example:
-
-```
-📜 Email Routing Rules 📜
-
-ALIAS              FORWARD TO       RULE ID    STATUS    CATEGORY
-───────────────    ──────────────  ────────   ──────   ─────────
-github@…           me@gmail.com     abc12345    Active   dev
-aws@…              me@gmail.com     def67890    Active   infra
-```
+### list — show every routing rule
 
 ```bash
 cf-alias list
 ```
 
-**Delete an alias:**
+Aligned table — alias, destination, rule ID, status, category. Categories are stored in `~/.config/cf-alias/categories.db` (SQLite), separate from the Cloudflare API.
 
-Pass the `Rule ID` from the `list` output to remove the rule. By default, `delete` prompts `Are you sure you want to delete rule <rule_id>? [y/N]` before touching the API — answer `y` or `Y` to proceed, anything else aborts without changes.
+### delete — remove an alias
 
 ```bash
 cf-alias delete <rule_id>
 ```
 
-Skip the prompt with `-y` / `--yes` for scripted or non-interactive use:
+By default, prompts `Are you sure? [y/N]` before touching the API. Flags:
 
 ```bash
-cf-alias delete <rule_id> --yes
+cf-alias delete <rule_id> --yes      # skip prompt (scripted use)
+cf-alias delete <rule_id> --dry-run  # show what would happen, no API call
 ```
 
-Preview what would happen without actually calling the API using `--dry-run`:
+### categorize — tag an existing rule
 
 ```bash
-cf-alias delete <rule_id> --dry-run
+cf-alias categorize <rule_id> dev       # set category
+cf-alias categorize <rule_id> --clear  # remove category
 ```
 
-**Categorize an alias:**
+Tags live in your local SQLite file, independent of the Cloudflare API.
 
-Attach a freeform category tag to an existing rule. Categories are stored locally in `~/.config/cf-alias/categories.db` (a SQLite file in your user config dir, separate from the Cloudflare API), so they survive reinstalls but are not synced to Cloudflare.
-
-```bash
-cf-alias categorize <rule_id> dev
-```
-
-Remove the category from a rule:
-
-```bash
-cf-alias categorize <rule_id> --clear
-```
-
-**Interactive menu:**
-
-Launch the interactive arrow-key menu to create, list, delete, and categorize aliases. Each option prompts you for input and confirms destructive actions before applying them.
+### tui — interactive menu
 
 ```bash
 cf-alias tui
 ```
 
-Shows a welcome banner on launch with your domain, then presents a menu with:
+Arrow-key menu built on `questionary` + `rich`. Menu: Create · List · Delete · Categorize · Quit.
 
-- **Create alias** — prompt for name and optional category; choose between typing a custom name or generating a random one
-- **List aliases** — prints a rich table with `●`/`○` status icons
-- **Delete alias** — select from a list, confirm before deleting
-- **Categorize alias** — set or clear a category tag
-- **Quit** — exit
+Navigation: arrow keys to move, `Enter` to confirm, `Ctrl+C` to cancel.
 
-Navigation: use the arrow keys to move between options, `Enter` to confirm, and `Ctrl+C` to cancel.
+---
+
+## Troubleshooting
+
+**My local fix isn't reflected in the installed binary.**
+
+The uv-tool binary lives at `~/.local/share/uv/tools/cf-alias/`, separate from your working tree. A normal reinstall can serve a stale cached wheel. Force a fresh build:
+
+```bash
+uv cache clean cf-alias && uv tool install --reinstall .
+```
+
+**`Missing required environment variables`**
+
+One of `CF_API_TOKEN`, `CF_ZONE_ID`, `DEFAULT_FORWARD_TO`, `DOMAIN` is unset or empty. Paste the template from the [Configuration](#configuration) section into the path `cf-alias` printed.
+
+**`Alias 'x@y.com' already exists`**
+
+The rule already lives in your zone. Pick a different name, or delete it first via `cf-alias list` → `cf-alias delete <id>`.
+
+**`Could not generate a unique alias after 10 attempts`**
+
+The random-name generator tried 10 words and every one collided. Try again, or pass a custom name.
+
+**`ImportError: No module named 'cf_alias'` (running tests)**
+
+Install the package in editable mode: `uv pip install -e .` (or `pip install -e .` with venv active).
+
+---
+
+## License
+
+MIT.
