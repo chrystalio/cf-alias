@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `delete` now prompts `Are you sure you want to delete rule <rule_id>? [y/N]` before calling the API; answering anything other than `y`/`Y` aborts without changes.
+- `delete` accepts `-y` / `--yes` to skip the confirmation prompt for scripted/non-interactive use.
+- `delete` accepts `--dry-run` to print which rule would be deleted and exit without touching the API.
+
 ## [0.3.1] - 2026-08-09
 
 ### Fixed

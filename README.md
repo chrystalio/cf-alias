@@ -158,8 +158,20 @@ cf-alias list
 
 **Delete an alias:**
 
-Pass the `Rule ID` from the `list` output to remove the rule.
+Pass the `Rule ID` from the `list` output to remove the rule. By default, `delete` prompts `Are you sure you want to delete rule <rule_id>? [y/N]` before touching the API — answer `y` or `Y` to proceed, anything else aborts without changes.
 
 ```bash
 cf-alias delete <rule_id>
+```
+
+Skip the prompt with `-y` / `--yes` for scripted or non-interactive use:
+
+```bash
+cf-alias delete <rule_id> --yes
+```
+
+Preview what would happen without actually calling the API using `--dry-run`:
+
+```bash
+cf-alias delete <rule_id> --dry-run
 ```
