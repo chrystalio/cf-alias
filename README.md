@@ -219,7 +219,7 @@ cf-alias tui
 
 Shows a welcome banner on launch with your domain, then presents a menu with:
 
-- **Create alias** — prompt for name and optional category
+- **Create alias** — prompt for name and optional category; choose between typing a custom name or generating a random one
 - **List aliases** — prints a rich table with `●`/`○` status icons
 - **Delete alias** — select from a list, confirm before deleting
 - **Categorize alias** — set or clear a category tag
