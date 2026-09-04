@@ -154,7 +154,23 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     add_parser = subparsers.add_parser("create", help="Create a new email alias")
-    add_parser.add_argument("name", type=str, help="Name of the email alias to add")
+    add_parser.add_argument(
+        "name",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Name of the email alias (omit with --generate)",
+    )
+    add_parser.add_argument(
+        "--generate",
+        action="store_true",
+        help="Auto-generate a random alias name (used in place of NAME)",
+    )
+    add_parser.add_argument(
+        "--print-only",
+        action="store_true",
+        help="With --generate: print the generated name and exit (no API call)",
+    )
     add_parser.add_argument(
         "--category", type=str, default=None, help="Category tag for the alias"
     )
