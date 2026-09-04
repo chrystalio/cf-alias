@@ -93,8 +93,23 @@ def _menu_create(ctx: AppContext) -> None:
         return
 
     if choice == "generate":
-        name = generate_alias_name()
-        console.print(f"  Generated: [cyan]{name}[/cyan]")
+        name = None
+        while True:
+            name = generate_alias_name()
+            console.print(f"\n  [cyan]{name}[/cyan]\n")
+            decision = questionary.select(
+                "Happy with this name?",
+                choices=[
+                    Choice(title="Accept", value="accept"),
+                    Choice(title="Regenerate", value="regenerate"),
+                    Choice(title="Cancel", value="cancel"),
+                ],
+                qmark=">>",
+            ).ask()
+            if decision == "accept":
+                break
+            if decision == "cancel":
+                return
     else:
         name = questionary.text(
             "Alias name (the part before @):",
