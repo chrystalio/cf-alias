@@ -1,5 +1,7 @@
 """Main CLI logic for Cloudflare Email Forwarding Alias Manager."""
 
+from __future__ import annotations
+
 import argparse
 import os
 import sys
@@ -182,6 +184,10 @@ def main():
     group.add_argument("category", type=str, nargs="?", help="Category name to assign")
     group.add_argument("--clear", action="store_true", help="Remove category from rule")
 
+    subparsers.add_parser(
+        "tui", help="Launch interactive Textual UI to browse and edit aliases"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -323,6 +329,10 @@ def main():
             print(
                 f"\n Rule {args.rule_id} categorized as '{args.category}'\n"
             )
+
+    elif args.command == "tui":
+        from .tui import launch_tui  # lazy: textual is heavy
+        launch_tui(ctx)
 
 
 if __name__ == "__main__":
