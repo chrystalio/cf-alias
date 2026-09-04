@@ -128,7 +128,7 @@ cf-alias create github
 **Generate a random name** when you don't care what it's called:
 
 ```bash
-cf-alias create --generate           # name is a random English word
+cf-alias create --generate           # name is word + first_name (e.g. sparrowsmith)
 cf-alias create --generate --print-only  # preview only, no API call
 ```
 

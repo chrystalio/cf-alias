@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.0] - 2026-09-04
 
 ### Added
-- `create --generate` flags the CLI to pick a random alias name (single English word via the `faker` library) instead of you supplying one. The generator walks every Cloudflare rule page and retries up to 10 times on collision, falling back to "use a custom name" if no unique word emerges.
+- `create --generate` flags the CLI to pick a random alias name (word + first name via the `faker` library, e.g. `sparrowsmith`) instead of you supplying one. The generator walks every Cloudflare rule page and retries up to 10 times on collision, falling back to "use a custom name" if no unique name emerges.
 - `create --generate --print-only` prints the generated name and exits without calling the Cloudflare API — useful for previewing a name before committing.
 - `faker` added to `dependencies` in `pyproject.toml` (and reflected in `uv.lock`).
 - `tui` create menu now offers a "Generate random name" option alongside the custom name prompt.
