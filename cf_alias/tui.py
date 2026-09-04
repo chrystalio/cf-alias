@@ -34,8 +34,26 @@ def _render_rules(ctx: AppContext, title: str = "Email Routing Rules") -> None:
     for h in HEADERS:
         table.add_column(h, style="cyan")
     for row in rules:
-        table.add_row(*[_safe_cell(c) for c in row])
+        cells = [_safe_cell(c) for c in row]
+        # Replace the STATUS cell (index 3) with a coloured icon
+        cells[3] = _status_icon(cells[3] == "Active")
+        table.add_row(*cells)
     console.print(table)
+
+
+def _WELCOME_BANNER(ctx: AppContext) -> None:
+    console.print()
+    console.print("  [bold cyan]╔═══════════════════════════════════════════╗[/bold cyan]")  # noqa: E501
+    console.print("  [bold cyan]║[/bold cyan]   [bold white]CF-ALIAS[/bold white]  [dim]Cloudflare Email Manager[/dim]   [bold cyan]║[/bold cyan]")  # noqa: E501
+    console.print("  [bold cyan]╠═══════════════════════════════════════════╣[/bold cyan]")  # noqa: E501
+    console.print(f"  [bold cyan]║[/bold cyan]   Domain: [yellow]{ctx.domain}[/yellow]" + " " * max(0, 31 - len(f"Domain: {ctx.domain}")) + "[bold cyan]║[/bold cyan]")  # noqa: E501
+    console.print("  [bold cyan]╚═══════════════════════════════════════════╝[/bold cyan]")  # noqa: E501
+    console.print()
+
+
+def _status_icon(enabled: bool) -> str:
+    """Return ● for active, ○ for inactive."""
+    return "[green]●[/green] Active" if enabled else "[dim]○[/dim] Inactive"
 
 
 def _menu_create(ctx: AppContext) -> None:
@@ -173,6 +191,7 @@ def _menu_categorize(ctx: AppContext) -> None:
 
 def launch_tui(ctx: AppContext) -> None:
     """Main menu loop. Returns when the user selects Quit."""
+    _WELCOME_BANNER(ctx)
     actions = {
         "create": _menu_create,
         "list": _menu_list,
