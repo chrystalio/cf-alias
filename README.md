@@ -6,11 +6,11 @@
 
 </div>
 
-| License | Python | Install |
-|---------|--------|---------|
-| ![MIT](https://img.shields.io/badge/license-MIT-blue) | ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue) | ![uv](https://img.shields.io/badge/uv-tool-orange) |
-
----
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/uv-tool-orange" alt="uv">
+</p>
 
 ## Features
 
@@ -26,16 +26,12 @@
 
 Run `cf-alias <subcommand> --help` for the full flag list.
 
----
-
 ## Prerequisites
 
 1. **A domain** with Cloudflare Email Routing enabled.
 2. **A Cloudflare API token** with **Email Routing: Edit** permission.
 3. **Your zone ID** — visible in the right sidebar of your Cloudflare dashboard.
 4. **Python 3.10+** (or use [`uv`](https://github.com/astral-sh/uv), which can manage Python for you).
-
----
 
 ## Quick Start
 
@@ -46,8 +42,6 @@ cp .env.example .env       # fill in your Cloudflare values
 uv tool install .          # or: pip install -e .
 cf-alias create github
 ```
-
----
 
 ## Installation
 
@@ -95,8 +89,6 @@ python -m cf_alias --help
 
 > The CLI command is `cf-alias` but the Python module is `cf_alias` — Python doesn't allow hyphens in identifiers. `pyproject.toml`'s `[project.scripts]` exposes the hyphenated name.
 
----
-
 ## Configuration
 
 `cf-alias` looks for your `.env` in this order:
@@ -120,8 +112,6 @@ DOMAIN=your_domain_here
 ```
 
 `.env` is gitignored. If `cf-alias` reports a missing env var, it prints the path and a template you can paste.
-
----
 
 ## Usage
 
@@ -190,8 +180,6 @@ Arrow-key menu built on `questionary` + `rich`. Menu: Create · List · Delete �
 
 Navigation: arrow keys to move, `Enter` to confirm, `Ctrl+C` to cancel.
 
----
-
 ## Troubleshooting
 
 **My local fix isn't reflected in the installed binary.**
@@ -217,8 +205,6 @@ The random-name generator tried 10 words and every one collided. Try again, or p
 **`ImportError: No module named 'cf_alias'` (running tests)**
 
 Install the package in editable mode: `uv pip install -e .` (or `pip install -e .` with venv active).
-
----
 
 ## License
 
