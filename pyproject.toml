@@ -1,12 +1,13 @@
 [project]
 name = "cf-alias"
-version = "0.3.1"
+version = "0.4.0"
 description = "Cloudflare Email Forwarding Alias Manager"
 requires-python = ">=3.10"
 
 dependencies = [
     "cloudflare",
-    "python-dotenv"
+    "python-dotenv",
+    "textual>=0.50",
 ]
 
 [project.optional-dependencies]
