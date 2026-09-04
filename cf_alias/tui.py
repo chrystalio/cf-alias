@@ -42,12 +42,34 @@ def _render_rules(ctx: AppContext, title: str = "Email Routing Rules") -> None:
 
 
 def _WELCOME_BANNER(ctx: AppContext) -> None:
+    """Render a bordered welcome banner with domain + watermark."""
+    from rich.text import Text
+
+    # Use a fixed interior width so all closing ║ align regardless of content
+    W = 46  # characters of visible content between the │ chars
+
+    def _row(content: Text) -> str:
+        """Pad content to W chars using len of stripped text (ignores markup)."""
+        visible = len(content.plain)
+        pad = max(0, W - visible)
+        return f"  [bold cyan]│[/bold cyan] {content}{' ' * pad} [bold cyan]│[/bold cyan]"  # noqa: E501
+
+    title = Text("CF-ALIAS  Cloudflare Email Manager", style="bold white")
+    domain = Text(f"Domain: {ctx.domain}", style="yellow")
+    watermark = Text("Created By: Chrystalio (Kristoff)", style="dim")
+
+    border_top = f"  [bold cyan]╔{'═' * (W + 2)}╗[/bold cyan]"
+    border_mid = f"  [bold cyan]╠{'═' * (W + 2)}╣[/bold cyan]"
+    border_bot = f"  [bold cyan]╚{'═' * (W + 2)}╝[/bold cyan]"
+
     console.print()
-    console.print("  [bold cyan]╔═══════════════════════════════════════════╗[/bold cyan]")  # noqa: E501
-    console.print("  [bold cyan]║[/bold cyan]   [bold white]CF-ALIAS[/bold white]  [dim]Cloudflare Email Manager[/dim]   [bold cyan]║[/bold cyan]")  # noqa: E501
-    console.print("  [bold cyan]╠═══════════════════════════════════════════╣[/bold cyan]")  # noqa: E501
-    console.print(f"  [bold cyan]║[/bold cyan]   Domain: [yellow]{ctx.domain}[/yellow]" + " " * max(0, 31 - len(f"Domain: {ctx.domain}")) + "[bold cyan]║[/bold cyan]")  # noqa: E501
-    console.print("  [bold cyan]╚═══════════════════════════════════════════╝[/bold cyan]")  # noqa: E501
+    console.print(border_top)  # noqa: E501
+    console.print(_row(title))
+    console.print(border_mid)  # noqa: E501
+    console.print(_row(domain))
+    console.print(border_mid)  # noqa: E501
+    console.print(_row(watermark))
+    console.print(border_bot)
     console.print()
 
 
