@@ -139,10 +139,23 @@ Creates a new alias rule — `github@yourdomain.com` — forwarding to your defa
 cf-alias create github
 ```
 
-Optionally tag it with a category at creation time:
+Auto-generate a random alias name instead of choosing your own:
+
+```bash
+cf-alias create --generate
+```
+
+Preview a generated name without creating it:
+
+```bash
+cf-alias create --generate --print-only
+```
+
+Tag it with a category at creation time:
 
 ```bash
 cf-alias create github --category dev
+cf-alias create --generate --category dev
 ```
 
 **List all aliases:**

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-04
+
+### Added
+- `create --generate` flags the CLI to pick a random alias name (single English word via the `faker` library) instead of you supplying one. The generator walks every Cloudflare rule page and retries up to 10 times on collision, falling back to "use a custom name" if no unique word emerges.
+- `create --generate --print-only` prints the generated name and exits without calling the Cloudflare API — useful for previewing a name before committing.
+- `faker` added to `dependencies` in `pyproject.toml` (and reflected in `uv.lock`).
+
 ## [0.4.0] - 2026-09-04
 
 ### Added
