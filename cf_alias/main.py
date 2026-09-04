@@ -107,7 +107,9 @@ def main():
 
     add_parser = subparsers.add_parser("create", help="Create a new email alias")
     add_parser.add_argument("name", type=str, help="Name of the email alias to add")
-    add_parser.add_argument("--category", type=str, default=None, help="Category tag for the alias")
+    add_parser.add_argument(
+        "--category", type=str, default=None, help="Category tag for the alias"
+    )
 
     subparsers.add_parser("list", help="list of email aliases")
 
@@ -126,7 +128,9 @@ def main():
         help="Show what would be deleted without deleting",
     )
 
-    cat_parser = subparsers.add_parser("categorize", help="Set or clear category for a rule")
+    cat_parser = subparsers.add_parser(
+        "categorize", help="Set or clear category for a rule"
+    )
     cat_parser.add_argument("rule_id", type=str, help="Rule ID to categorize")
     group = cat_parser.add_mutually_exclusive_group(required=True)
     group.add_argument("category", type=str, nargs="?", help="Category name to assign")
@@ -195,7 +199,7 @@ def main():
         print(f"  - Rule ID     : {rule.id if rule else 'N/A'}")
         print("  - Status      : Active\n")
 
-        if args.category:
+        if args.category and rule and rule.id:
             db.set_category(rule.id, args.category)
 
     elif args.command == "list":
