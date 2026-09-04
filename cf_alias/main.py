@@ -12,6 +12,7 @@ import dotenv
 from cloudflare import Cloudflare
 
 from . import db
+from .generator import generate_alias_name
 
 HEADERS = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS", "CATEGORY")
 
@@ -55,6 +56,23 @@ def _rule_to_row(rule, category: str | None) -> tuple[str, str, str, str, str]:
         rule_id = "Unknown"
     status = "Active" if rule.enabled else "Inactive"
     return (alias_email, destination_email, rule_id, status, category or "")
+
+
+def _alias_exists(ctx: AppContext, target_email: str) -> bool:
+    """Return True if a rule with `target_email` exists in the zone, else False.
+
+    Walks every page of `rules.list(...)` so a match on page 2+ is not missed.
+    """
+    page = ctx.client.email_routing.rules.list(zone_id=ctx.zone_id)
+    while True:
+        for rule in page:
+            first_matcher = rule.matchers[0] if rule.matchers else None
+            if first_matcher is not None and first_matcher.value == target_email:
+                return True
+        if page.has_next_page():
+            page = page.get_next_page()
+        else:
+            return False
 
 # Template for the user config file. No secrets — placeholders only.
 ENV_TEMPLATE = """\
@@ -228,6 +246,27 @@ def main():
     ctx = build_context()
 
     if args.command == "create":
+        if args.print_only:
+            # Validation guarantees --generate was passed.
+            print(generate_alias_name())
+            return
+
+        if args.generate:
+            attempts = 0
+            while attempts < 10:
+                candidate = generate_alias_name()
+                attempts += 1
+                # _alias_exists returns True if the alias exists at all
+                # (regardless of where it forwards to).
+                if not _alias_exists(ctx, f"{candidate}@{ctx.domain}"):
+                    args.name = candidate
+                    break
+            else:
+                raise SystemExit(
+                    "Could not generate a unique alias after 10 attempts. "
+                    "Try again or pass a custom name."
+                )
+
         target_email = f"{args.name}@{ctx.domain}"
 
         # Paginate through ALL existing rules. Cloudflare's rules.list()
