@@ -3,12 +3,56 @@
 import argparse
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import dotenv
 from cloudflare import Cloudflare
 
 from . import db
+
+HEADERS = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS", "CATEGORY")
+
+
+def _cell(value, missing="Unknown"):
+    """Coerce a rule field into a printable string.
+    Any None / missing → 'Unknown'.
+    """
+    if value is None:
+        return missing
+    return str(value) if value != "" else missing
+
+
+def _safe_cell(value, missing="Unknown"):
+    """Defensively coerce any cell value to a string."""
+    if value is None:
+        return missing
+    if isinstance(value, str):
+        return value
+    return str(value) if value != "" else missing
+
+
+def _rule_to_row(rule, category: str | None) -> tuple[str, str, str, str, str]:
+    """Convert a Cloudflare rule object to a 5-tuple row for display."""
+    try:
+        first_matcher = rule.matchers[0] if rule.matchers else None
+        alias_email = (
+            _cell(first_matcher.value, "N/A")
+            if first_matcher is not None
+            else "N/A"
+        )
+        first_action = rule.actions[0] if rule.actions else None
+        if first_action is not None and first_action.value:
+            destination_email = _cell(first_action.value[0], "N/A")
+        else:
+            destination_email = "N/A"
+        rule_id = _cell(rule.id)
+    except (IndexError, AttributeError, TypeError):
+        alias_email = "Unknown"
+        destination_email = "Unknown"
+        rule_id = "Unknown"
+    status = "Active" if rule.enabled else "Inactive"
+    return (alias_email, destination_email, rule_id, status, category or "")
 
 # Template for the user config file. No secrets — placeholders only.
 ENV_TEMPLATE = """\
@@ -53,11 +97,24 @@ def _find_env() -> Path | None:
 
 REQUIRED_ENV_VARS = ("CF_API_TOKEN", "CF_ZONE_ID", "DOMAIN", "DEFAULT_FORWARD_TO")
 
-# Module-level constants populated lazily by _load_env().
-CF_API_TOKEN: str | None = None
-CF_ZONE_ID: str | None = None
-DOMAIN: str | None = None
-DEFAULT_FORWARD_TO: str | None = None
+
+@dataclass(frozen=True)
+class AppContext:
+    client: Cloudflare
+    zone_id: str
+    domain: str
+    default_forward_to: str
+
+
+def build_context() -> AppContext:
+    _load_env()
+    require_env()
+    return AppContext(
+        client=Cloudflare(api_token=_require_env_str("CF_API_TOKEN")),
+        zone_id=_require_env_str("CF_ZONE_ID"),
+        domain=_require_env_str("DOMAIN"),
+        default_forward_to=_require_env_str("DEFAULT_FORWARD_TO"),
+    )
 
 
 def require_env():
@@ -81,25 +138,14 @@ def _require_env_str(name: str) -> str:
 
 
 def _load_env():
-    """Load .env file lazily and populate module constants.
+    """Load the selected .env file into the process environment.
 
     Called from main() so importing this module has no side effects.
     """
-    global CF_API_TOKEN, CF_ZONE_ID, DOMAIN, DEFAULT_FORWARD_TO
     dotenv.load_dotenv(_find_env())
-    CF_API_TOKEN = os.getenv("CF_API_TOKEN")
-    CF_ZONE_ID = os.getenv("CF_ZONE_ID")
-    DOMAIN = os.getenv("DOMAIN")
-    DEFAULT_FORWARD_TO = os.getenv("DEFAULT_FORWARD_TO")
 
 
 def main():
-    _load_env()
-    require_env()
-    zone_id = _require_env_str("CF_ZONE_ID")
-    domain = _require_env_str("DOMAIN")
-    default_forward_to = _require_env_str("DEFAULT_FORWARD_TO")
-    client = Cloudflare(api_token=CF_API_TOKEN)
     parser = argparse.ArgumentParser(
         description="Cloudflare Email Forwarding Alias Manager"
     )
@@ -142,13 +188,15 @@ def main():
         parser.print_help()
         return
 
+    ctx = build_context()
+
     if args.command == "create":
-        target_email = f"{args.name}@{domain}"
+        target_email = f"{args.name}@{ctx.domain}"
 
         # Paginate through ALL existing rules. Cloudflare's rules.list()
         # returns a SyncV4PagePaginationArray — iterate every page so we
         # don't miss a match sitting on page 2+.
-        page = client.email_routing.rules.list(zone_id=zone_id)
+        page = ctx.client.email_routing.rules.list(zone_id=ctx.zone_id)
         while True:
             for rule in page:
                 existing_alias = rule.matchers[0].value if rule.matchers else None
@@ -158,16 +206,16 @@ def main():
                     if first_action is not None:
                         action_value = first_action.value
                         existing_destination = action_value[0] if action_value else None
-                    if existing_destination == default_forward_to:
+                    if existing_destination == ctx.default_forward_to:
                         print(
                             f"\n Alias '{target_email}' already exists and "
-                            f"forwards to '{default_forward_to}'.\n"
+                            f"forwards to '{ctx.default_forward_to}'.\n"
                         )
                     else:
                         print(
                             f"\n Alias '{target_email}' already exists but "
                             f"forwards to '{existing_destination}', not "
-                            f"'{default_forward_to}'.\n"
+                            f"'{ctx.default_forward_to}'.\n"
                         )
                     return
             if page.has_next_page():
@@ -175,8 +223,8 @@ def main():
             else:
                 break
 
-        rule = client.email_routing.rules.create(
-            zone_id=zone_id,
+        rule = ctx.client.email_routing.rules.create(
+            zone_id=ctx.zone_id,
             name=f"Alias for {args.name}",
             enabled=True,
             matchers=[
@@ -189,13 +237,13 @@ def main():
             actions=[
                 {
                     "type": "forward",
-                    "value": [default_forward_to],
+                    "value": [ctx.default_forward_to],
                 }
             ],
         )
         print("\n Email Routing Rule Created Successfully! ")
         print(f"  - Alias       : {target_email}")
-        print(f"  - Forward To  : {default_forward_to}")
+        print(f"  - Forward To  : {ctx.default_forward_to}")
         print(f"  - Rule ID     : {rule.id if rule else 'N/A'}")
         print("  - Status      : Active\n")
 
@@ -204,70 +252,27 @@ def main():
 
     elif args.command == "list":
         # Materialise every page so the table shows the full zone state.
-        page = client.email_routing.rules.list(zone_id=zone_id)
-        rules = list(page)
-        while page.has_next_page():
-            page = page.get_next_page()
-            rules.extend(page)
+        rules = list(ctx.client.email_routing.rules.list(zone_id=ctx.zone_id))
 
         if not rules:
             print("\n No email routing rules found for this zone.\n")
             return
 
-        def _cell(value, missing="Unknown"):
-            """Coerce a rule field into a printable string.
-            Any None / missing → 'Unknown'.
-            """
-            if value is None:
-                return missing
-            return str(value) if value != "" else missing
-
-        rows = []
-        for rule in rules:
-            try:
-                first_matcher = rule.matchers[0] if rule.matchers else None
-                alias_email = (
-                    _cell(first_matcher.value, "N/A")
-                    if first_matcher is not None
-                    else "N/A"
-                )
-                first_action = rule.actions[0] if rule.actions else None
-                if first_action is not None and first_action.value:
-                    destination_email = _cell(first_action.value[0], "N/A")
-                else:
-                    destination_email = "N/A"
-                rule_id = _cell(rule.id)
-            except (IndexError, AttributeError, TypeError):
-                alias_email = "Unknown"
-                destination_email = "Unknown"
-                rule_id = "Unknown"
-            status = "Active" if rule.enabled else "Inactive"
-            rows.append((alias_email, destination_email, rule_id, status))
-
         # Enrich rows with categories from the local SQLite database
         rows = [
-            (*row, db.get_category(row[2]) or "")
-            for row in rows
+            _rule_to_row(rule, db.get_category(str(rule.id)) or "")
+            for rule in rules
         ]
 
-        headers = ("ALIAS", "FORWARD TO", "RULE ID", "STATUS", "CATEGORY")
-
         # Defense in depth: coerce every cell to a string before measuring or
-        # rendering. _cell() should have already done this, but if a future
+        # rendering. _rule_to_row() should have already done this, but if a future
         # SDK field shape leaks a None/non-str through, the table still renders
         # instead of raising TypeError on len()/ljust().
-        def _safe_cell(value, missing="Unknown"):
-            if value is None:
-                return missing
-            if isinstance(value, str):
-                return value
-            return str(value) if value != "" else missing
-
         safe_rows = [
             tuple(_safe_cell(c) for c in row)
             for row in rows
         ]
-        safe_headers = tuple(_safe_cell(h, missing=h) for h in headers)
+        safe_headers = tuple(_safe_cell(h, missing=h) for h in HEADERS)
 
         widths = [
             max(len(safe_headers[i]), *(len(row[i]) for row in safe_rows))
@@ -297,9 +302,9 @@ def main():
                 print("\nAborted.\n")
                 return
 
-        client.email_routing.rules.delete(
-            zone_id=zone_id,
-            rule_identifier=args.rule_id
+        ctx.client.email_routing.rules.delete(
+            zone_id=ctx.zone_id,
+            rule_identifier=args.rule_id,
         )
         db.clear_category(args.rule_id)
         print(
