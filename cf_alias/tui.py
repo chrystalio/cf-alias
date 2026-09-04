@@ -94,8 +94,6 @@ class AliasApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        # Warm SQLite connection on main thread before any to_thread calls
-        db._get_conn()
         grid = self.query_one("#grid", DataTable)
         for i, header in enumerate(HEADERS):
             grid.add_column(header, key=str(i))

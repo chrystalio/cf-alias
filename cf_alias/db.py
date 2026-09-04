@@ -5,10 +5,12 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+import threading
 from pathlib import Path
 
 # Module-level singleton connection (lazily initialized on first use)
 _conn: sqlite3.Connection | None = None
+_lock = threading.Lock()
 
 
 def _db_path() -> Path:
@@ -39,21 +41,25 @@ def _get_conn() -> sqlite3.Connection:
         db_path = _db_path()
         # Ensure parent directory exists (especially on first run)
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(db_path)
+        # check_same_thread=False allows the connection to be used from
+        # worker threads (e.g. asyncio.to_thread in the TUI). Concurrent
+        # access is serialised by `_lock` in the write helpers below.
+        _conn = sqlite3.connect(db_path, check_same_thread=False)
         _conn.row_factory = sqlite3.Row
 
         # Create tables if they don't exist
-        _conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS alias_categories (
-                rule_id TEXT PRIMARY KEY,
-                category TEXT,
-                set_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_category ON alias_categories(category);
-            """
-        )
-        _conn.commit()
+        with _lock:
+            _conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS alias_categories (
+                    rule_id TEXT PRIMARY KEY,
+                    category TEXT,
+                    set_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_category ON alias_categories(category);
+                """
+            )
+            _conn.commit()
 
     return _conn
 
@@ -71,22 +77,24 @@ def get_category(rule_id: str) -> str | None:
 def set_category(rule_id: str, category: str) -> None:
     """Upsert a category for a rule_id."""
     conn = _get_conn()
-    conn.execute(
-        """
-        INSERT INTO alias_categories (rule_id, category)
-        VALUES (?, ?)
-        ON CONFLICT(rule_id) DO UPDATE SET category = excluded.category
-        """,
-        (rule_id, category),
-    )
-    conn.commit()
+    with _lock:
+        conn.execute(
+            """
+            INSERT INTO alias_categories (rule_id, category)
+            VALUES (?, ?)
+            ON CONFLICT(rule_id) DO UPDATE SET category = excluded.category
+            """,
+            (rule_id, category),
+        )
+        conn.commit()
 
 
 def clear_category(rule_id: str) -> None:
     """Delete the category row for a rule_id."""
     conn = _get_conn()
-    conn.execute("DELETE FROM alias_categories WHERE rule_id = ?", (rule_id,))
-    conn.commit()
+    with _lock:
+        conn.execute("DELETE FROM alias_categories WHERE rule_id = ?", (rule_id,))
+        conn.commit()
 
 
 def list_by_category(category: str) -> list[str]:
