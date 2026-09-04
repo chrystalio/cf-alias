@@ -44,7 +44,7 @@ def _render_rules(ctx: AppContext, title: str = "Email Routing Rules") -> None:
 
 
 # Render the banner once at module load — never changes.
-_BANNER_ART = pyfiglet.figlet_format("cf-alias", font="big").rstrip()
+_BANNER_ART = pyfiglet.figlet_format("cf-alias", font="standard").rstrip()
 
 
 def _WELCOME_BANNER(ctx: AppContext) -> None:
