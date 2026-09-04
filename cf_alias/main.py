@@ -210,6 +210,21 @@ def main():
         parser.print_help()
         return
 
+    # Validate flag combinations before any API calls
+    if args.command == "create":
+        if args.name and args.generate:
+            raise SystemExit(
+                "Pass only one of NAME or --generate."
+            )
+        if not args.name and not args.generate:
+            raise SystemExit(
+                "Provide a NAME or use --generate."
+            )
+        if args.print_only and not args.generate:
+            raise SystemExit(
+                "--print-only requires --generate."
+            )
+
     ctx = build_context()
 
     if args.command == "create":
