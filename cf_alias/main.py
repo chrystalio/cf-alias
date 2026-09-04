@@ -185,7 +185,7 @@ def main():
     group.add_argument("--clear", action="store_true", help="Remove category from rule")
 
     subparsers.add_parser(
-        "tui", help="Launch interactive Textual UI to browse and edit aliases"
+        "tui", help="Launch interactive menu to browse and edit aliases"
     )
 
     args = parser.parse_args()

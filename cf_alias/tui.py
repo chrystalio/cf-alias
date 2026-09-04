@@ -1,199 +1,203 @@
-"""Interactive Textual TUI for browsing and editing Cloudflare email aliases."""
+"""Interactive arrow-key menu TUI for cf-alias."""
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING
+import questionary
+from questionary import Choice
+from rich.console import Console
+from rich.table import Table
 
-from textual.app import App, ComposeResult
-from textual.binding import Binding
-from textual.screen import ModalScreen
-from textual.widgets import DataTable, Footer, Header, Input, Static
-
-if TYPE_CHECKING:
-    from cf_alias.main import AppContext
-
-# Reuse from main.py
 from cf_alias import db
-from cf_alias.main import HEADERS, _cell, _rule_to_row
+from cf_alias.main import (
+    HEADERS,
+    AppContext,
+    _cell,
+    _rule_to_row,
+    _safe_cell,
+)
+
+console = Console()
 
 
-class CategoryModal(ModalScreen[str | None]):
-    """Modal to edit the category for a rule."""
-
-    def __init__(self, rule_id: str, current_category: str) -> None:
-        super().__init__()
-        self.rule_id = rule_id
-        self.current_category = current_category or ""
-
-    def compose(self) -> ComposeResult:
-        yield Static(
-            f"Category for rule {self.rule_id}:", id="label"
-        )
-        yield Input(
-            value=self.current_category,
-            id="category-input",
-            placeholder="Enter category...",
-        )
-        yield Static("Enter to save · Esc to cancel", id="hint")
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value or None)
-
-
-class ConfirmDeleteModal(ModalScreen[bool]):
-    """Modal to confirm rule deletion."""
-
-    def __init__(self, rule_id: str, alias: str) -> None:
-        super().__init__()
-        self.rule_id = rule_id
-        self.alias = alias
-
-    def compose(self) -> ComposeResult:
-        yield Static(f"Delete alias {self.alias}?", id="label")
-        yield Static(f"Rule ID: {self.rule_id}", id="rule-id")
-        yield Static("y / n", id="hint")
-
-    def key_y(self) -> None:
-        self.dismiss(True)
-
-    def key_n(self) -> None:
-        self.dismiss(False)
-
-
-class AliasApp(App):
-    """Interactive alias browser and editor."""
-
-    BINDINGS = [
-        Binding("q", "quit", "Quit", show=True),
-        Binding("r", "refresh", "Refresh", show=True),
-        Binding("s", "cycle_sort", "Sort", show=True),
-        Binding("c", "edit_category", "Category", show=True),
-        Binding("d", "delete_rule", "Delete", show=True),
+def _fetch_rules(ctx: AppContext) -> list[tuple[str, ...]]:
+    page = ctx.client.email_routing.rules.list(zone_id=ctx.zone_id)
+    return [
+        _rule_to_row(r, db.get_category(_cell(r.id)) or "") for r in list(page)
     ]
 
-    def __init__(self, ctx: AppContext) -> None:
-        super().__init__()
-        self.ctx = ctx
-        self._all_rows: list[tuple[str, ...]] = []
-        self._filter_text: str = ""
-        self._sort_col: int = 0  # column index
-        self._sort_dir: bool = True  # True = asc
-        self._loading: bool = False
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Input(
-            placeholder="Filter aliases (ESC to clear)...",
-            id="filter",
+def _render_rules(ctx: AppContext, title: str = "Email Routing Rules") -> None:
+    rules = _fetch_rules(ctx)
+    if not rules:
+        console.print("\n[yellow]No email routing rules found.[/yellow]\n")
+        return
+    table = Table(title=title, show_lines=True)
+    for h in HEADERS:
+        table.add_column(h, style="cyan")
+    for row in rules:
+        table.add_row(*[_safe_cell(c) for c in row])
+    console.print(table)
+
+
+def _menu_create(ctx: AppContext) -> None:
+    name = questionary.text(
+        "Alias name (the part before @):",
+        validate=lambda text: len(text) > 0 or "Name cannot be empty",
+    ).ask()
+    if name is None:
+        return
+    category = questionary.text(
+        "Category (optional, press Enter to skip):",
+        default="",
+    ).ask()
+    if category is None:
+        return
+
+    target_email = f"{name}@{ctx.domain}"
+
+    # Check for existing rule first (idempotent behaviour mirrors CLI create)
+    page = ctx.client.email_routing.rules.list(zone_id=ctx.zone_id)
+    while True:
+        for rule in page:
+            existing = rule.matchers[0].value if rule.matchers else None
+            if existing == target_email:
+                first_action = rule.actions[0] if rule.actions else None
+                existing_dest = None
+                if first_action is not None and first_action.value:
+                    existing_dest = first_action.value[0]
+                if existing_dest == ctx.default_forward_to:
+                    console.print(
+                        f"[yellow]Alias '{target_email}' already exists "
+                        f"and forwards to '{ctx.default_forward_to}'.[/yellow]"
+                    )
+                else:
+                    console.print(
+                        f"[yellow]Alias '{target_email}' already exists "
+                        f"but forwards to '{existing_dest}', not "
+                        f"'{ctx.default_forward_to}'.[/yellow]"
+                    )
+                return
+        if page.has_next_page():
+            page = page.get_next_page()
+        else:
+            break
+
+    rule = ctx.client.email_routing.rules.create(
+        zone_id=ctx.zone_id,
+        name=f"Alias for {name}",
+        enabled=True,
+        matchers=[
+            {"type": "literal", "field": "to", "value": target_email},
+        ],
+        actions=[
+            {"type": "forward", "value": [ctx.default_forward_to]},
+        ],
+    )
+    if category and rule and rule.id:
+        db.set_category(rule.id, category)
+    console.print(f"[green]Created alias {target_email}[/green]")
+
+
+def _menu_list(ctx: AppContext) -> None:
+    _render_rules(ctx)
+
+
+def _menu_delete(ctx: AppContext) -> None:
+    rules = _fetch_rules(ctx)
+    if not rules:
+        console.print("[yellow]No aliases to delete.[/yellow]")
+        return
+    choices = [
+        Choice(
+            title=f"{row[0]}  ->  {row[1]}  ({row[2]})",
+            value=row[2],
         )
-        yield DataTable(
-            id="grid",
-            cursor_type="row",
-            zebra_stripes=True,
+        for row in rules
+    ]
+    choices.append(Choice(title="<- Cancel", value=None))
+    rule_id = questionary.select(
+        "Select alias to delete:",
+        choices=choices,
+    ).ask()
+    if rule_id is None:
+        return
+    if not questionary.confirm(
+        f"Really delete alias with ID {rule_id}?", default=False
+    ).ask():
+        return
+    ctx.client.email_routing.rules.delete(
+        zone_id=ctx.zone_id, rule_identifier=rule_id
+    )
+    db.clear_category(rule_id)
+    console.print(f"[green]Deleted rule {rule_id}[/green]")
+
+
+def _menu_categorize(ctx: AppContext) -> None:
+    rules = _fetch_rules(ctx)
+    if not rules:
+        console.print("[yellow]No aliases to categorize.[/yellow]")
+        return
+    choices = [
+        Choice(
+            title=f"{row[0]}  (current: {db.get_category(row[2]) or '—'})",
+            value=row[2],
         )
-        yield Footer()
-
-    def on_mount(self) -> None:
-        grid = self.query_one("#grid", DataTable)
-        for i, header in enumerate(HEADERS):
-            grid.add_column(header, key=str(i))
-        grid.sort("0")  # initial sort
-        self.run_worker(self._load_rules, exclusive=True)
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        self._filter_text = event.value
-        self._render_rows()
-
-    def on_input_pressed(self, event: Input.Pressed) -> None:  # type: ignore[reportIncompatibleMethodOverride]
-        # ESC in filter clears it
-        pass
-
-    def action_refresh(self) -> None:
-        if self._loading:
-            return
-        self._loading = True
-        self.run_worker(self._load_rules, exclusive=True)
-
-    def _sync_fetch_rules(self) -> list[tuple[str, ...]]:
-        page = self.ctx.client.email_routing.rules.list(zone_id=self.ctx.zone_id)
-        return [_rule_to_row(r, db.get_category(_cell(r.id)) or "") for r in list(page)]
-
-    async def _load_rules(self) -> None:
-        self._all_rows = await asyncio.to_thread(self._sync_fetch_rules)
-        self._loading = False
-        self._render_rows()
-
-    def _render_rows(self) -> None:
-        grid = self.query_one("#grid", DataTable)
-        # Filter
-        filtered = self._all_rows
-        if self._filter_text:
-            q = self._filter_text.lower()
-            filtered = [r for r in filtered if any(q in str(c).lower() for c in r)]
-        # Sort
-        col = self._sort_col
-        rev = not self._sort_dir
-        filtered = sorted(filtered, key=lambda r: str(r[col]).lower(), reverse=rev)
-        # Clear and populate
-        grid.clear()
-        for row in filtered:
-            grid.add_row(*row, key=row[2])  # row_key = rule_id
-
-    def action_cycle_sort(self) -> None:
-        self._sort_col = (self._sort_col + 1) % len(HEADERS)
-        self._sort_dir = True
-        self._render_rows()
-
-    def action_edit_category(self) -> None:
-        grid = self.query_one("#grid", DataTable)
-        cursor = grid.cursor_row
-        if cursor is None or cursor >= len(self._all_rows):
-            return
-        # Reconstruct filtered list to find the selected row's rule_id
-        filtered = self._get_filtered_sorted()
-        if cursor >= len(filtered):
-            return
-        rule_id = filtered[cursor][2]
-        current = db.get_category(rule_id) or ""
-        def _save(result: str | None) -> None:
-            if result is not None:
-                db.set_category(rule_id, result)
-                self.action_refresh()
-        self.push_screen(CategoryModal(rule_id, current), _save)
-
-    def action_delete_rule(self) -> None:
-        grid = self.query_one("#grid", DataTable)
-        cursor = grid.cursor_row
-        if cursor is None:
-            return
-        filtered = self._get_filtered_sorted()
-        if cursor >= len(filtered):
-            return
-        rule_id = filtered[cursor][2]
-        alias = filtered[cursor][0]
-
-        def _confirm(result: bool | None) -> None:
-            if result:
-                self.ctx.client.email_routing.rules.delete(
-                    zone_id=self.ctx.zone_id,
-                    rule_identifier=rule_id,
-                )
-                db.clear_category(rule_id)
-                self.action_refresh()
-
-        self.push_screen(ConfirmDeleteModal(rule_id, alias), _confirm)
-
-    def _get_filtered_sorted(self) -> list[tuple[str, ...]]:
-        filtered = self._all_rows
-        if self._filter_text:
-            q = self._filter_text.lower()
-            filtered = [r for r in filtered if any(q in str(c).lower() for c in r)]
-        col = self._sort_col
-        rev = not self._sort_dir
-        return sorted(filtered, key=lambda r: str(r[col]).lower(), reverse=rev)
+        for row in rules
+    ]
+    choices.append(Choice(title="<- Cancel", value=None))
+    rule_id = questionary.select(
+        "Select alias to categorize:",
+        choices=choices,
+    ).ask()
+    if rule_id is None:
+        return
+    action = questionary.select(
+        f"What do you want to do with {rule_id}?",
+        choices=[
+            Choice(title="Set category", value="set"),
+            Choice(title="Clear category", value="clear"),
+            Choice(title="<- Cancel", value=None),
+        ],
+    ).ask()
+    if action == "set":
+        cat = questionary.text(
+            "Category name:",
+            validate=lambda t: len(t) > 0 or "Cannot be empty",
+        ).ask()
+        if cat:
+            db.set_category(rule_id, cat)
+            console.print(f"[green]Categorized as '{cat}'[/green]")
+    elif action == "clear":
+        db.clear_category(rule_id)
+        console.print("[green]Category cleared[/green]")
 
 
 def launch_tui(ctx: AppContext) -> None:
-    """Entry point registered as the `tui` subcommand."""
-    app = AliasApp(ctx)
-    app.run()
+    """Main menu loop. Returns when the user selects Quit."""
+    actions = {
+        "create": _menu_create,
+        "list": _menu_list,
+        "delete": _menu_delete,
+        "categorize": _menu_categorize,
+    }
+    while True:
+        choice = questionary.select(
+            "What do you want to do?",
+            choices=[
+                Choice(title="Create alias", value="create"),
+                Choice(title="List aliases", value="list"),
+                Choice(title="Delete alias", value="delete"),
+                Choice(title="Categorize alias", value="categorize"),
+                Choice(title="Quit", value="quit"),
+            ],
+            qmark=">>",
+        ).ask()
+        if choice is None or choice == "quit":
+            console.print("Bye!")
+            return
+        try:
+            actions[choice](ctx)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] {e}")
+        questionary.press_any_key_to_continue(
+            "Press any key to return to menu..."
+        ).ask()

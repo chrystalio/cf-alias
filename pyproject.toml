@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "cloudflare",
     "python-dotenv",
-    "textual>=0.50",
+    "questionary>=2.0",
 ]
 
 [project.optional-dependencies]
