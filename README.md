@@ -117,13 +117,13 @@ DOMAIN=your_domain_here
 
 CLI form: `cf-alias <subcommand> [options]`.
 
-### create — add a new alias
+### `create`
+
+Creates `github@<DOMAIN>` forwarding to `DEFAULT_FORWARD_TO`. If the alias already exists, prints a warning and exits — no duplicates.
 
 ```bash
 cf-alias create github
 ```
-
-Creates `github@<DOMAIN>` forwarding to `DEFAULT_FORWARD_TO`. If the alias already exists, prints a warning and exits — no duplicates.
 
 **Generate a random name** when you don't care what it's called:
 
@@ -140,7 +140,7 @@ The generator retries up to 10 times on collision; after that, pass a custom nam
 cf-alias create github --category dev
 ```
 
-### list — show every routing rule
+### `list`
 
 ```bash
 cf-alias list
@@ -148,37 +148,32 @@ cf-alias list
 
 Aligned table — alias, destination, rule ID, status, category. Categories are stored in `~/.config/cf-alias/categories.db` (SQLite), separate from the Cloudflare API.
 
-### delete — remove an alias
-
-```bash
-cf-alias delete <rule_id>
-```
+### `delete`
 
 By default, prompts `Are you sure? [y/N]` before touching the API. Flags:
 
 ```bash
+cf-alias delete <rule_id>
 cf-alias delete <rule_id> --yes      # skip prompt (scripted use)
 cf-alias delete <rule_id> --dry-run  # show what would happen, no API call
 ```
 
-### categorize — tag an existing rule
+### `categorize`
+
+Tags live in your local SQLite file, independent of the Cloudflare API.
 
 ```bash
 cf-alias categorize <rule_id> dev       # set category
 cf-alias categorize <rule_id> --clear  # remove category
 ```
 
-Tags live in your local SQLite file, independent of the Cloudflare API.
+### `tui`
 
-### tui — interactive menu
+Arrow-key menu built on `questionary` + `rich`. Menu: Create · List · Delete · Categorize · Quit. Arrow keys to move, `Enter` to confirm, `Ctrl+C` to cancel.
 
 ```bash
 cf-alias tui
 ```
-
-Arrow-key menu built on `questionary` + `rich`. Menu: Create · List · Delete · Categorize · Quit.
-
-Navigation: arrow keys to move, `Enter` to confirm, `Ctrl+C` to cancel.
 
 ## Troubleshooting
 
