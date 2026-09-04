@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `create --generate --print-only` prints the generated name and exits without calling the Cloudflare API — useful for previewing a name before committing.
 - `faker` added to `dependencies` in `pyproject.toml` (and reflected in `uv.lock`).
 - `tui` create menu now offers a "Generate random name" option alongside the custom name prompt.
+- `pyfiglet` added to `dependencies`; TUI welcome banner redesigned with pyfiglet `slant` font and added author credit.
 
 ## [0.4.0] - 2026-09-04
 
