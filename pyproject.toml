@@ -8,6 +8,7 @@ dependencies = [
     "cloudflare",
     "python-dotenv",
     "questionary>=2.0",
+    "rich",
 ]
 
 [project.optional-dependencies]
