@@ -1,6 +1,7 @@
 """Interactive arrow-key menu TUI for cf-alias."""
 from __future__ import annotations
 
+import pyfiglet
 import questionary
 from questionary import Choice
 from rich.console import Console
@@ -42,23 +43,15 @@ def _render_rules(ctx: AppContext, title: str = "Email Routing Rules") -> None:
     console.print(table)
 
 
-# Block-letter ASCII art for the banner. The shape on the right spells
-# "ALIAS" using mixed-width Unicode box-drawing characters.
-_BANNER_ART = [
-    "[bold cyan]██████╗ ███████╗██╗   ██╗    ███████╗ ██████╗ ██╗   ██╗███████╗███████╗████████╗[/bold cyan]",  # noqa: E501
-    "[bold cyan]██╔══██╗██╔════╝██║   ██║    ██╔════╝██╔═══██╗██║   ██║╭──────╮╭────────╮╰────────╯[/bold cyan]",  # noqa: E501
-    "[bold cyan]██████╔╝█████╗  ██║   ██║    █████╗  ██║   ██║╰─────╯│  ██╗  ██╗  ██████╗ ╰─────╮[/bold cyan]",  # noqa: E501
-    "[bold cyan]██╔══██╗██╔══╝  ╚██╗ ██╔╝    ██╔══╝  ██║   ██║        ╰──╯  ╰──╯  ╰─────╯       ╰─────╮[/bold cyan]",  # noqa: E501
-    "[bold cyan]██║  ██║███████╗ ╚████╔╝     ███████╗╚██████╔╝                                  ╰────────╮[/bold cyan]",  # noqa: E501
-    "[bold cyan]╚═╝  ╚═╝╚══════╝  ╚═══╝      ╚══════╝ ╚═════╝                                          [/bold cyan]",  # noqa: E501
-]
+# Render the banner once at module load — never changes.
+_BANNER_ART = pyfiglet.figlet_format("cf-alias", font="big").rstrip()
 
 
 def _WELCOME_BANNER(ctx: AppContext) -> None:
-    """Render a block-letter ASCII art banner."""
+    """Render a pyfiglet ASCII-art banner."""
     console.print()
-    for line in _BANNER_ART:
-        console.print(f"  {line}")
+    for line in _BANNER_ART.splitlines():
+        console.print(f"  [bold cyan]{line}[/bold cyan]")
     console.print(f"\n  [dim]Domain:[/dim]  {ctx.domain}")
     console.print()
 

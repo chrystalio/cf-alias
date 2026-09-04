@@ -8,6 +8,7 @@ dependencies = [
     "cloudflare",
     "python-dotenv",
     "faker",
+    "pyfiglet",
     "questionary>=2.0",
     "rich",
 ]
