@@ -9,5 +9,23 @@ dependencies = [
     "python-dotenv"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pyright",
+]
+
 [project.scripts]
 cf-alias = "cf_alias:main"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+fixable = ["ALL"]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
