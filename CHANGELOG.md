@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `delete` now prompts `Are you sure you want to delete rule <rule_id>? [y/N]` before calling the API; answering anything other than `y`/`Y` aborts without changes.
 - `delete` accepts `-y` / `--yes` to skip the confirmation prompt for scripted/non-interactive use.
 - `delete` accepts `--dry-run` to print which rule would be deleted and exit without touching the API.
+- `tui` subcommand to launch an interactive Textual UI for browsing, filtering, sorting, and editing aliases ([#PR])
 
 ## [0.3.1] - 2026-08-09
 

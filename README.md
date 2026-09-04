@@ -175,3 +175,35 @@ Preview what would happen without actually calling the API using `--dry-run`:
 ```bash
 cf-alias delete <rule_id> --dry-run
 ```
+
+**Interactive TUI:**
+
+Launch the interactive terminal UI to browse, filter, sort, and edit aliases.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ Email Routing Alias Manager                                                       │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ Filter aliases (ESC to clear)...                                                  │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ ALIAS                   │ FORWARD TO       │ RULE ID  │ STATUS │ CATEGORY        │
+├─────────────────────────┼──────────────────┼──────────┼────────┼─────────────────┤
+│ github@yourdomain.com   │ me@gmail.com     │ abc12345 │ Active │ dev             │
+│ ...                                                                              │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ Q Quit · R Refresh · S Sort · C Category · D Delete                              │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Key | Action |
+|-----|--------|
+| `q` / Ctrl+C | Quit |
+| `r` | Refresh from API |
+| `s` | Cycle sort column |
+| `c` | Edit category for selected row |
+| `d` | Delete selected rule (with confirmation) |
+| `ESC` | Clear filter |
+
+```bash
+cf-alias tui
+```
